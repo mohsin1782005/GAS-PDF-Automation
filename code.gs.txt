@@ -1,0 +1,64 @@
+/**
+ * GOOGLE APPS SCRIPT PDF GENERATOR ENGINE
+ */
+
+function generateProfessionalReport() {
+  // 1. CONSTANTS - Replace the IDs below with your own
+  const TEMPLATE_ID = '14ARCL0ZMTHF2XS48pBU7iQus56sCD3R-JxUZP9XjQAM';
+  const FOLDER_ID = '1f-GAjSUT7a2exR5k0y3AOHsDUZgoG4KV';
+  
+  // 2. GET DATA FROM THE ROW YOU HAVE SELECTED
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const activeRow = sheet.getActiveCell().getRow(); // <--- This finds where your mouse is!
+  
+  // Safety check: If you click the header (Row 1), stop the script
+  if (activeRow < 2) {
+    SpreadsheetApp.getUi().alert('Please select a row with client data (Row 2 or below).');
+    return;
+  }
+
+  // Get data for the row you actually clicked on
+  const data = sheet.getRange(activeRow, 1, 1, 5).getValues()[0]; 
+  
+  const clientData = {
+    name: data[0],
+    date: data[1],
+    revenue: data[2],
+    status: data[3],
+    notes: data[4]
+  };
+  // 3. CREATE A TEMPORARY COPY OF THE DOC
+  const folder = DriveApp.getFolderById(FOLDER_ID);
+  const templateFile = DriveApp.getFileById(TEMPLATE_ID);
+  const tempCopy = templateFile.makeCopy(`${clientData.name} - Report`, folder);
+  const doc = DocumentApp.openById(tempCopy.getId());
+  const body = doc.getBody();
+
+  // 4. REPLACE PLACEHOLDERS WITH REAL DATA
+  body.replaceText('{{ClientName}}', clientData.name);
+  body.replaceText('{{Date}}', clientData.date);
+  body.replaceText('{{TotalRevenue}}', Number(clientData.revenue).toLocaleString('en-US', {style: 'currency', currency: 'USD'}));
+  body.replaceText('{{ProjectStatus}}', clientData.status);
+  body.replaceText('{{Comments}}', clientData.notes);
+
+  // 5. SAVE AND CONVERT TO PDF
+  doc.saveAndClose();
+  const pdfBlob = tempCopy.getAs(MimeType.PDF);
+  const finalPdf = folder.createFile(pdfBlob);
+  
+ // 6. CLEAN UP & LOG LINK
+  tempCopy.setTrashed(true); 
+  sheet.getRange(activeRow, 6).setValue(finalPdf.getUrl()); // <--- Changed from '2' to 'activeRow'
+  
+  SpreadsheetApp.getUi().alert('Success! PDF Generated and Link added to Column F.');
+}
+
+/**
+ * CREATES A CUSTOM MENU WHEN THE SHEET OPENS
+ */
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('🚀 Automation Pro')
+      .addItem('Generate PDF Report', 'generateProfessionalReport')
+      .addToUi();
+}
